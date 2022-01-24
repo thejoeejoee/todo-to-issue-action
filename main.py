@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 """Convert IDE TODOs to GitHub issues."""
+from __future__ import annotations
 
+import dataclasses
 import os
 import requests
 import re
@@ -21,23 +23,21 @@ class LineStatus(Enum):
     UNCHANGED = 2
 
 
-class Issue(object):
+@dataclasses.dataclass
+class Issue:
     """Basic Issue model for collecting the necessary info to send to GitHub."""
-
-    def __init__(self, title, labels, assignees, milestone, user_projects, org_projects, body, hunk, file_name,
-                 start_line, markdown_language, status):
-        self.title = title
-        self.labels = labels
-        self.assignees = assignees
-        self.milestone = milestone
-        self.user_projects = user_projects
-        self.org_projects = org_projects
-        self.body = body
-        self.hunk = hunk
-        self.file_name = file_name
-        self.start_line = start_line
-        self.markdown_language = markdown_language
-        self.status = status
+    title: str
+    labels: list[str]
+    assignees: list[str]
+    milestone: str | None
+    user_projects: list[str]
+    org_projects: list[str]
+    body: str
+    hunk: str
+    file_name: str
+    start_line: int
+    markdown_language: str
+    status: LineStatus
 
 
 class GitHubClient(object):
@@ -79,11 +79,11 @@ class GitHubClient(object):
         elif len(self.commits) == 1:
             # There is only one commit
             diff_url = f'{self.repos_url}{self.repo}/commits/{self.sha}'
-        else: 
+        else:
             # There are several commits: compare with the oldest one
             oldest = sorted(self.commits, key=self.get_timestamp)[0]['id']
-            diff_url = f'{self.repos_url}{self.repo}/compare/{oldest}...{self.sha}'    
-        
+            diff_url = f'{self.repos_url}{self.repo}/compare/{oldest}...{self.sha}'
+
         diff_headers = {
             'Accept': 'application/vnd.github.v3.diff',
             'Authorization': f'token {self.token}'
@@ -387,7 +387,7 @@ class TodoParser(object):
                 if prev_block and prev_block['file'] == block['file']:
                     code_blocks[prev_index]['hunk_end'] = line_numbers.start()
                     code_blocks[prev_index]['hunk'] = (prev_block['hunk']
-                                                       [prev_block['hunk_start']:line_numbers.start()])
+                    [prev_block['hunk_start']:line_numbers.start()])
                 elif prev_block:
                     code_blocks[prev_index]['hunk'] = prev_block['hunk'][prev_block['hunk_start']:]
 
@@ -623,43 +623,52 @@ class TodoParser(object):
         return False
 
 
+def process_todos_as_issues(*, client: GitHubClient, issues: list[Issue]):
+    # Cycle through the Issue objects and create or close a corresponding GitHub issue for each.
+    for j, raw_issue in enumerate(issues):
+        print(f'Processing issue {j + 1} of {len(issues)}')
+        if raw_issue.status == LineStatus.ADDED:
+            status_code = client.create_issue(raw_issue)
+            if status_code == 201:
+                print('Issue created')
+            else:
+                print('Issue could not be created')
+        elif raw_issue.status == LineStatus.DELETED and os.getenv('INPUT_CLOSE_ISSUES', 'true') == 'true':
+            status_code = client.close_issue(raw_issue)
+            if status_code == 201:
+                print('Issue closed')
+            else:
+                print('Issue could not be closed')
+        # Stagger the requests to be on the safe side.
+        sleep(1)
+
+
 if __name__ == "__main__":
     # Create a basic client for communicating with GitHub, automatically initialised with environment variables.
     client = GitHubClient()
-    if client.diff_url or len(client.commits) != 0:
-        # Get the diff from the last pushed commit.
-        last_diff = StringIO(client.get_last_diff())
-        # Parse the diff for TODOs and create an Issue object for each.
-        raw_issues = TodoParser().parse(last_diff)
-        # This is a simple, non-perfect check to filter out any TODOs that have just been moved.
-        # It looks for items that appear in the diff as both an addition and deletion.
-        # It is based on the assumption that TODOs will not have identical titles in identical files.
-        issues_to_process = []
-        for values, similar_issues in itertools.groupby(raw_issues, key=operator.attrgetter('title', 'file_name',
-                                                                                            'markdown_language')):
-            similar_issues = list(similar_issues)
-            if (len(similar_issues) == 2 and ((similar_issues[0].status == LineStatus.ADDED and
-                                               similar_issues[1].status == LineStatus.DELETED) or
-                                              (similar_issues[1].status == LineStatus.ADDED and
-                                               similar_issues[0].status == LineStatus.DELETED))):
-                print(f'Issue "{values[0]}" appears as both addition and deletion. '
-                      f'Assuming this issue has been moved so skipping.')
-                continue
-            issues_to_process.extend(similar_issues)
-        # Cycle through the Issue objects and create or close a corresponding GitHub issue for each.
-        for j, raw_issue in enumerate(issues_to_process):
-            print(f'Processing issue {j + 1} of {len(issues_to_process)}')
-            if raw_issue.status == LineStatus.ADDED:
-                status_code = client.create_issue(raw_issue)
-                if status_code == 201:
-                    print('Issue created')
-                else:
-                    print('Issue could not be created')
-            elif raw_issue.status == LineStatus.DELETED and os.getenv('INPUT_CLOSE_ISSUES', 'true') == 'true':
-                status_code = client.close_issue(raw_issue)
-                if status_code == 201:
-                    print('Issue closed')
-                else:
-                    print('Issue could not be closed')
-            # Stagger the requests to be on the safe side.
-            sleep(1)
+    if not (client.diff_url or len(client.commits) != 0):
+        exit()
+
+    # Get the diff from the last pushed commit.
+    last_diff = StringIO(client.get_last_diff())
+    # Parse the diff for TODOs and create an Issue object for each.
+    raw_issues = TodoParser().parse(last_diff)
+    # This is a simple, non-perfect check to filter out any TODOs that have just been moved.
+    # It looks for items that appear in the diff as both an addition and deletion.
+    # It is based on the assumption that TODOs will not have identical titles in identical files.
+    issues_to_process = []
+    for values, similar_issues in itertools.groupby(
+            raw_issues,
+            key=operator.attrgetter('title', 'file_name', 'markdown_language')
+    ):
+        similar_issues = list(similar_issues)
+        if (len(similar_issues) == 2 and ((similar_issues[0].status == LineStatus.ADDED and
+                                           similar_issues[1].status == LineStatus.DELETED) or
+                                          (similar_issues[1].status == LineStatus.ADDED and
+                                           similar_issues[0].status == LineStatus.DELETED))):
+            print(f'Issue "{values[0]}" appears as both addition and deletion. '
+                  f'Assuming this issue has been moved so skipping.')
+            continue
+        issues_to_process.extend(similar_issues)
+
+    process_todos_as_issues(client=client, issues=issues_to_process)
