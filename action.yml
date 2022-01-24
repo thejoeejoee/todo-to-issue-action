@@ -66,3 +66,7 @@ inputs:
     description: "The username of the person who triggered the action"
     required: true
     default: "${{ github.actor }}"
+  PROCESS_TO_SINGLE_ISSUE:
+    description: "Optional input that specifies if all the todos should be specified into one issue"
+    required: false
+    default: false

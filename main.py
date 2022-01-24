@@ -623,6 +623,10 @@ class TodoParser(object):
         return False
 
 
+def process_todos_to_single_issue(*, client: GitHubClient, issues: list[Issue]):
+    print(f'Process all {len(issues)} todos into one issue.')
+
+
 def process_todos_as_issues(*, client: GitHubClient, issues: list[Issue]):
     # Cycle through the Issue objects and create or close a corresponding GitHub issue for each.
     for j, raw_issue in enumerate(issues):
@@ -671,4 +675,7 @@ if __name__ == "__main__":
             continue
         issues_to_process.extend(similar_issues)
 
-    process_todos_as_issues(client=client, issues=issues_to_process)
+    if os.getenv('INPUT_PROCESS_TO_SINGLE_ISSUE', 'true') == 'true':
+        process_todos_to_single_issue(client=client, issues=issues_to_process)
+    else:
+        process_todos_as_issues(client=client, issues=issues_to_process)
