@@ -145,8 +145,11 @@ class GitHubClient(object):
             if 'next' in links:
                 self._get_existing_issues(page + 1)
 
-    def issue_to_line_url(self, issue):
+    def todo_to_file_line_url(self, issue):
         return f'https://github.com/{self.repo}/blob/{self.sha}/{issue.file_name}#L{issue.start_line}'
+
+    def todo_to_resolving_commit(self, issue):
+        return f'https://github.com/{self.repo}/commit/{self.sha}'
 
     def create_issue(self, issue):
         """Create a dict containing the issue details and send it to GitHub."""
@@ -154,7 +157,7 @@ class GitHubClient(object):
         if len(title) > 80:
             # Title is too long.
             title = title[:80] + '...'
-        url_to_line = self.issue_to_line_url(issue=issue)
+        url_to_line = self.todo_to_file_line_url(issue=issue)
 
         formatted_issue_body = self.line_break.join(issue.body)
         body = (formatted_issue_body + '\n\n'
@@ -698,7 +701,7 @@ def process_todos_to_single_issue(*, client: GitHubClient, issues: list[Issue]):
 
     lines = target['body'].splitlines()
     done_heading_index = lines.index('## Done')
-    active_todos_lines = lines[lines.index('## Active') + 1:]
+    active_todos_lines = lines[lines.index('## Active') + 1:done_heading_index]
     active_todos_titles = [
         # its "* [ ] ()[] Title"       or "* [ ] #XXX"
         #      ^^^^^^    ^                 ^^^^^^
@@ -745,7 +748,7 @@ def process_todos_to_single_issue(*, client: GitHubClient, issues: list[Issue]):
                 del active_titles_to_lines[subissue_title]
 
             line = found_todo.as_single_line(
-                file_public_url=client.issue_to_line_url(found_todo),
+                file_public_url=client.todo_to_file_line_url(found_todo),
                 title=subissue_title if existing_subissue_number else None
             )
             active_todos_lines.append(f'* [ ] {line}')
@@ -762,10 +765,8 @@ def process_todos_to_single_issue(*, client: GitHubClient, issues: list[Issue]):
                 done_todo_lines.append(f'* [x] ~~{line_to_remove}~~')
             else:
                 print(f'Removed, but not found in lines, so?')
-                line = found_todo.as_single_line(file_public_url=client.issue_to_line_url(found_todo))
+                line = found_todo.as_single_line(file_public_url=client.todo_to_resolving_commit(found_todo))
                 done_todo_lines.append(f'* [x] ~~{line}~~')
-
-
 
 
     update_request = requests.patch(
