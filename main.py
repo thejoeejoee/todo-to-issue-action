@@ -703,7 +703,7 @@ def process_todos_to_single_issue(*, client: GitHubClient, issues: list[Issue]):
         # its "* [ ] ()[] Title"       or "* [ ] #XXX"
         #      ^^^^^^    ^                 ^^^^^^
         #    stripped  partition          stripped
-        (line[6:].partition(' ')[2] or line[:6]).strip()
+        (line[6:].partition(' ')[2] or line[6:]).strip()
         for line in active_todos_lines
     ]
     active_titles_to_lines = dict(zip(active_todos_titles, active_todos_lines))
