@@ -1,4 +1,4 @@
-FROM python:3.10-slim AS builder
+FROM python:3.10.0-slim AS builder
 ADD main.py /app/main.py
 WORKDIR /app
 
@@ -10,4 +10,5 @@ FROM ragavan/python-distroless:3.10.0
 COPY --from=builder /app /app
 WORKDIR /app
 ENV PYTHONPATH /app
+ENTRYPOINT ["python"]
 CMD ["/app/main.py"]
