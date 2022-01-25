@@ -703,10 +703,13 @@ def process_todos_to_single_issue(*, client: GitHubClient, issues: list[Issue]):
     # done_todos = lines[done_heading_index + 1:]
     number_to_existing_issues = {i['number']: i for i in client.existing_issues}
 
+    print('Existing issues:', number_to_existing_issues)
+
     for found_issue in issues_to_process:
         if found_issue.status == LineStatus.ADDED:
             active_todos_lines.append(f'* [ ] {found_issue.as_single_line("???")}')
         elif found_issue.status == LineStatus.DELETED:
+            # TODO could be already extracted to issue
             line_to_remove = active_titles_to_lines[found_issue.title]
             active_todos_lines.remove(line_to_remove)
 
@@ -715,7 +718,7 @@ def process_todos_to_single_issue(*, client: GitHubClient, issues: list[Issue]):
         headers=client.issue_headers,
         data=json.dumps(dict(
             body="# TODO\n## Active\n{}".format(
-                '\n'.join(active_todos_lines)
+                '\n'.join(sorted(active_todos_lines))
             )
         ))
     )
