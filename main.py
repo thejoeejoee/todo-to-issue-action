@@ -699,7 +699,13 @@ def process_todos_to_single_issue(*, client: GitHubClient, issues: list[Issue]):
     lines = target['body'].splitlines()
     # done_heading_index = lines.index('## Done')
     active_todos_lines = lines[lines.index('## Active') + 1:]
-    active_todos_titles = [line[6:].partition(' ')[2].strip() for line in active_todos_lines]
+    active_todos_titles = [
+        # its "* [ ] ()[] Title"       or "* [ ] #XXX"
+        #      ^^^^^^    ^                 ^^^^^^
+        #    stripped  partition          stripped
+        (line[6:].partition(' ')[2] or line[:6]).strip()
+        for line in active_todos_lines
+    ]
     active_titles_to_lines = dict(zip(active_todos_titles, active_todos_lines))
     # done_todos = lines[done_heading_index + 1:]
     number_to_existing_issues = {i['number']: i for i in client.existing_issues}
