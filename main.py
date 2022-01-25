@@ -691,13 +691,13 @@ def process_todos_to_single_issue(*, client: GitHubClient, issues: list[Issue]):
         new_issue_request = requests.post(
             url=client.issues_url,
             headers=client.issue_headers,
-            data=json.dumps(dict(title=title, body="# TODO\n## Active", labels=['todo']))
+            data=json.dumps(dict(title=title, body="# TODO\n## Active\n\n## Done", labels=['todo']))
         )
         assert new_issue_request.ok, 'Successfully created new issue on GitHub'
         target = new_issue_request.json()
 
     lines = target['body'].splitlines()
-    # done_heading_index = lines.index('## Done')
+    done_heading_index = lines.index('## Done')
     active_todos_lines = lines[lines.index('## Active') + 1:]
     active_todos_titles = [
         # its "* [ ] ()[] Title"       or "* [ ] #XXX"
@@ -707,7 +707,7 @@ def process_todos_to_single_issue(*, client: GitHubClient, issues: list[Issue]):
         for line in active_todos_lines
     ]
     active_titles_to_lines = dict(zip(active_todos_titles, active_todos_lines))
-    # done_todos = lines[done_heading_index + 1:]
+    done_todo_lines = lines[done_heading_index + 1:]
     number_to_existing_issues = {i['number']: i for i in client.existing_issues}
 
     print('Existing GH issues:', client.existing_issues)
@@ -758,15 +758,23 @@ def process_todos_to_single_issue(*, client: GitHubClient, issues: list[Issue]):
                 print(f'Removed TODO found in active lines, removing the line')
                 # completly removed todo
                 active_todos_lines.remove(line_to_remove)
+                del active_titles_to_lines[found_todo.title]
+                done_todo_lines.append(f'* [x] ~~{line_to_remove}~~')
             else:
                 print(f'Removed, but not found in lines, so?')
+                line = found_todo.as_single_line(file_public_url=client.issue_to_line_url(found_todo))
+                done_todo_lines.append(f'* [x] ~~{line}~~')
+
+
+
 
     update_request = requests.patch(
         url=f'{client.issues_url}/{target["number"]}',
         headers=client.issue_headers,
         data=json.dumps(dict(
-            body="# TODO\n## Active\n{}".format(
-                '\n'.join(sorted(active_todos_lines))
+            body="# TODO\n## Active\n{}\n## Done\n{}".format(
+                '\n'.join(sorted(active_todos_lines)),
+                '\n'.join(sorted(done_todo_lines)),
             )
         ))
     )
