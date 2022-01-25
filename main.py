@@ -709,7 +709,7 @@ def process_todos_to_single_issue(*, client: GitHubClient, issues: list[Issue]):
 
     for found_issue in issues_to_process:
         print(f'Processing {found_issue.title} {found_issue.file_name} {found_issue.status}')
-        if found_issue.status == LineStatus.ADDED:
+        if found_issue.status in (LineStatus.ADDED, LineStatus.UNCHANGED):
             already_existing_line = active_titles_to_lines.get(found_issue.title)
             if already_existing_line:
                 print(f'Already in active issues, so remove to refresh the link')
@@ -732,7 +732,6 @@ def process_todos_to_single_issue(*, client: GitHubClient, issues: list[Issue]):
                 active_todos_lines.remove(line_to_remove)
             else:
                 print(f'Removed, but not found in lines, so?')
-
 
     update_request = requests.patch(
         url=f'{client.issues_url}/{target["number"]}',
