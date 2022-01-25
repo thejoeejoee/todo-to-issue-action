@@ -691,7 +691,7 @@ def process_todos_to_single_issue(*, client: GitHubClient, issues: list[Issue]):
         new_issue_request = requests.post(
             url=client.issues_url,
             headers=client.issue_headers,
-            data=json.dumps(dict(title=title, body="# TODO\n## Active"))
+            data=json.dumps(dict(title=title, body="# TODO\n## Active", labels=['todo']))
         )
         assert new_issue_request.ok, 'Successfully created new issue on GitHub'
         target = new_issue_request.json()
