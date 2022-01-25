@@ -708,9 +708,11 @@ def process_todos_to_single_issue(*, client: GitHubClient, issues: list[Issue]):
     print('Found TODO changes:', issues)
 
     for found_issue in issues_to_process:
+        print(f'Processing {found_issue.title} {found_issue.file_name} {found_issue.status}')
         if found_issue.status == LineStatus.ADDED:
             already_existing_line = active_titles_to_lines.get(found_issue.title)
             if already_existing_line:
+                print(f'Already in active issues, so remove to refresh the link')
                 # it's already there, so remove because we want refresh the link
                 active_todos_lines.remove(already_existing_line)
                 del active_titles_to_lines[found_issue.title]
@@ -719,12 +721,18 @@ def process_todos_to_single_issue(*, client: GitHubClient, issues: list[Issue]):
                 f'* [ ] '
                 f'{found_issue.as_single_line(client.issue_to_line_url(found_issue))}'
             )
+            print(f'Added to active lines, current lines: {len(active_todos_lines)}')
         elif found_issue.status == LineStatus.DELETED:
             # TODO could be already extracted to issue
             line_to_remove = active_titles_to_lines.get(found_issue.title)
+
             if line_to_remove:
+                print(f'Removed TODO found in active lines, removing the line')
                 # completly removed todo
                 active_todos_lines.remove(line_to_remove)
+            else:
+                print(f'Removed, but not found in lines, so?')
+
 
     update_request = requests.patch(
         url=f'{client.issues_url}/{target["number"]}',
