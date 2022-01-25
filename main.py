@@ -73,7 +73,7 @@ class Issue:
         creation of all files is not complete`
         """
         return f'[{self.file_name}:{self.start_line}]' \
-               f'({file_public_url}#L{self.start_line})' \
+               f'({file_public_url})' \
                f' {self.title}'
 
 
@@ -145,7 +145,7 @@ class GitHubClient(object):
             if 'next' in links:
                 self._get_existing_issues(page + 1)
 
-    def issue_to_line(self, issue):
+    def issue_to_line_url(self, issue):
         return f'https://github.com/{self.repo}/blob/{self.sha}/{issue.file_name}#L{issue.start_line}'
 
     def create_issue(self, issue):
@@ -154,7 +154,7 @@ class GitHubClient(object):
         if len(title) > 80:
             # Title is too long.
             title = title[:80] + '...'
-        url_to_line = self.issue_to_line(issue=issue)
+        url_to_line = self.issue_to_line_url(issue=issue)
 
         formatted_issue_body = self.line_break.join(issue.body)
         body = (formatted_issue_body + '\n\n'
@@ -709,7 +709,11 @@ def process_todos_to_single_issue(*, client: GitHubClient, issues: list[Issue]):
 
     for found_issue in issues_to_process:
         if found_issue.status == LineStatus.ADDED:
-            active_todos_lines.append(f'* [ ] {found_issue.as_single_line("???")}')
+            # https://github.com/github/codeql/blob/b212af08a6cffbb434f3c8a2795a579e092792fd/README.md
+            active_todos_lines.append(
+                f'* [ ] '
+                f'{found_issue.as_single_line(client.issue_to_line_url(found_issue))}'
+            )
         elif found_issue.status == LineStatus.DELETED:
             # TODO could be already extracted to issue
             line_to_remove = active_titles_to_lines.get(found_issue.title)
