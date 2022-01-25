@@ -704,7 +704,7 @@ def process_todos_to_single_issue(*, client: GitHubClient, issues: list[Issue]):
     # done_todos = lines[done_heading_index + 1:]
     number_to_existing_issues = {i['number']: i for i in client.existing_issues}
 
-    print('Existing GH issues:', number_to_existing_issues)
+    print('Existing GH issues:', client.existing_issues)
     print('Found TODO changes:', issues)
 
     for found_todo in issues_to_process:
@@ -712,7 +712,7 @@ def process_todos_to_single_issue(*, client: GitHubClient, issues: list[Issue]):
 
         if found_todo.status in (LineStatus.ADDED, LineStatus.UNCHANGED):
             already_existing_line = active_titles_to_lines.get(found_todo.title)
-            add_to_lines = True
+            existing_subissue_number = None
 
             if already_existing_line:
                 print(f'Already in active issues, so remove to refresh the link')
@@ -720,22 +720,30 @@ def process_todos_to_single_issue(*, client: GitHubClient, issues: list[Issue]):
                 active_todos_lines.remove(already_existing_line)
                 del active_titles_to_lines[found_todo.title]
             else:
-                print('Not found directly in lines, but maybe was converted to an issue?')
-                for existing_issue in client.existing_issues:
-                    if f'TODO: {found_todo.title}' in existing_issue.get('body'):
-                        print(f'Found as converted to issue: {existing_issue.get("number")}')
+                print('Not found directly in lines (by title), but maybe was converted to an issue?')
+                for existing_subissue in client.existing_issues:
+                    if f'TODO: {found_todo.title}' in existing_subissue.get('body'):
+                        print(f'Found as converted to issue: {existing_subissue.get("number")}')
+                        print(f'So remove that line and refresh with link to file.')
                         # so it should be already in lines wiht a form of * [ ] #XXX
-                        add_to_lines = False
+                        existing_subissue_number = existing_subissue.get("number")
                         break
                 else:
                     print(f'Not found in other issues, so just add the line.')
 
-            if add_to_lines:
-                active_todos_lines.append(
-                    f'* [ ] '
-                    f'{found_todo.as_single_line(client.issue_to_line_url(found_todo))}'
-                )
-                print(f'Added to active lines, |current lines|: {len(active_todos_lines)}')
+            line = active_titles_to_lines.get(subissue_title := f'#{existing_subissue_number}')
+            if existing_subissue_number:
+                print('Found subissue and found a line, so remove since we want update the link')
+                active_todos_lines.remove(line)
+                del active_titles_to_lines[subissue_title]
+
+            active_todos_lines.append(
+                f'* [ ] ' +
+                f'{found_todo.as_single_line(client.issue_to_line_url(found_todo))}'
+                if not existing_subissue_number else
+                f'#{existing_subissue_number}'
+            )
+            print(f'Added to active lines, |current lines|: {len(active_todos_lines)}')
         elif found_todo.status == LineStatus.DELETED:
             # TODO could be already extracted to issue
             line_to_remove = active_titles_to_lines.get(found_todo.title)
