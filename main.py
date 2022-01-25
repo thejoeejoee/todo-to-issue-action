@@ -709,7 +709,12 @@ def process_todos_to_single_issue(*, client: GitHubClient, issues: list[Issue]):
 
     for found_issue in issues_to_process:
         if found_issue.status == LineStatus.ADDED:
-            # https://github.com/github/codeql/blob/b212af08a6cffbb434f3c8a2795a579e092792fd/README.md
+            already_existing_line = active_titles_to_lines.get(found_issue.title)
+            if already_existing_line:
+                # it's already there, so remove because we want refresh the link
+                active_todos_lines.remove(already_existing_line)
+                del active_titles_to_lines[found_issue.title]
+
             active_todos_lines.append(
                 f'* [ ] '
                 f'{found_issue.as_single_line(client.issue_to_line_url(found_issue))}'
