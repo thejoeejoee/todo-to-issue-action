@@ -70,3 +70,7 @@ inputs:
     description: "Optional input that specifies if all the todos should be specified into one issue"
     required: false
     default: false
+  TARGET_ISSUE_TITLE:
+    description: "Optional input that specifies the name of target issue, if PROCESS_TO_SINGLE_ISSUE is enabled"
+    required: false
+    default: 'TODO'
