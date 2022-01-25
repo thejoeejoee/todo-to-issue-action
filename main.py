@@ -67,14 +67,14 @@ class Issue:
     def __getitem__(self, item):
         return getattr(self, item)
 
-    def as_single_line(self, file_public_url):
+    def as_single_line(self, file_public_url, title=None):
         """
         [path_to_file:line](githuburl_with_hash_and_line) `self.is_recursive = False: will need to be a 2nd pass as
         creation of all files is not complete`
         """
         return f'[{self.file_name}:{self.start_line}]' \
                f'({file_public_url})' \
-               f' {self.title}'
+               f' {title or self.title}'
 
 
 class GitHubClient(object):
@@ -744,12 +744,11 @@ def process_todos_to_single_issue(*, client: GitHubClient, issues: list[Issue]):
                 active_todos_lines.remove(line)
                 del active_titles_to_lines[subissue_title]
 
-            active_todos_lines.append(
-                f'* [ ] ' +
-                f'{found_todo.as_single_line(client.issue_to_line_url(found_todo))}'
-                if not existing_subissue_number else
-                f'#{existing_subissue_number}'
+            line = found_todo.as_single_line(
+                file_public_url=client.issue_to_line_url(found_todo),
+                title=subissue_title if existing_subissue_number else None
             )
+            active_todos_lines.append(f'* [ ] {line}')
             print(f'Added to active lines, |current lines|: {len(active_todos_lines)}')
         elif found_todo.status == LineStatus.DELETED:
             # TODO could be already extracted to issue
