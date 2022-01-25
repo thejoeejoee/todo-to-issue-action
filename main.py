@@ -685,6 +685,7 @@ def process_todos_to_single_issue(*, client: GitHubClient, issues: list[Issue]):
         # Target issue already exists
         if issue['title'] == title:
             target = issue
+            break
     else:
         # Post new issue to github
         new_issue_request = requests.post(
