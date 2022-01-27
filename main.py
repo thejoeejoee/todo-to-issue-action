@@ -766,7 +766,8 @@ def process_todos_to_single_issue(*, client: GitHubClient, issues: list[Issue]):
                 # completly removed todo
                 active_todos_lines.remove(line_to_remove)
                 del active_titles_to_lines[found_todo.title]
-                done_todo_lines.append(f'* [x] ~~{line_to_remove}~~')
+                # [6:] to remove the * [ ] prefix
+                done_todo_lines.append(f'* [x] ~~{line_to_remove[6:]}~~')
             else:
                 print(f'Removed, but not found in lines, so?')
                 line = found_todo.as_single_line(file_public_url=client.todo_to_resolving_commit(found_todo))
